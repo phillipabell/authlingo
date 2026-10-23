@@ -99,6 +99,44 @@ Not tested on hosted (hypotheses or self-hosted only):
 - The hook's renderer handles `{{ .Var }}` and `{{ .Data.key }}` only (other Go actions are passed through as text);
   the template path supports full Go templates. Lint does not yet warn when a body needs the template path.
 
+## Supabase Free plan limits (measured)
+
+Measured 2026-10-23 on a hosted Free project, default email provider, no custom SMTP (full setup and raw numbers
+above under "Measured on a hosted Free project"):
+
+- **Template path returns 400.** `PATCH /v1/projects/<ref>/config/auth` with `mailer_subjects_*`/`mailer_templates_*`
+  content got `400 Email template modification is not available for free tier projects using the default email
+  provider.` Custom templates need custom SMTP or the Send Email hook.
+- **Default provider rate limit: about 2 emails then 429.** Two signups sent; the third got
+  `429 over_email_send_rate_limit`. This is the provider's limit (per project, observed as roughly 2/hour), not
+  something authlingo or the hook controls, and it applies even when the hook only logs instead of sending.
+- **Send Email hook deploys and runs on the same template-blocked project** (function deploy, hook secret, and
+  `hook_send_email_enabled` all accepted). Without `SMTP_HOST` set it logs what it would send instead of sending,
+  which is how locale picking was checked without hitting the rate limit.
+
+Anything not listed here (e.g. actual hosted delivery through a mail provider) was not measured on hosted; see the
+measured sections above for what is self-hosted-only vs. a hypothesis.
+
+## Send Email hook (reference)
+
+`authlingo build` writes a complete Send Email hook Edge Function to `dist/send-email/` (the same code lives in this
+repo under `hook/send-email/` for reading without building). It is a **copy-paste reference**, not a published
+package: deploy it yourself with `supabase functions deploy send-email --no-verify-jwt`, then set
+`SEND_EMAIL_HOOK_SECRET` and point the project's Send Email hook at it. Without `SMTP_HOST` set it only logs what it
+would send (useful for checking locale picking before wiring a mail provider):
+
+```ts
+// hook/send-email/index.ts (excerpt) - verify the signature, pick the locale, render, send or log
+const { user, email_data } = new Webhook(secret).verify(payload, Object.fromEntries(req.headers));
+const locale = pickLocale(config, user.user_metadata?.[config.localeKey ?? 'locale']);
+const e = sources[locale]?.[type] ?? sources[config.default]?.[type];
+const subject = renderSimple(e.subject, data), html = renderSimple(e.body, data);
+if (capture) { console.log(JSON.stringify({ authlingo_capture: true, subject, locale })); }
+else { await transport.sendMail({ to, subject, html, ... }); }
+```
+
+See `hook/send-email/index.ts` and `hook/send-email/core.ts` for the full, working version.
+
 ## Tests
 
 `npm test` (9 tests; Go-dependent ones skip without Go). Self-hosted measurement: `selfhost/` (compose overrides and scripts).
