@@ -1,0 +1,10 @@
+{
+  "name": "authlingo",
+  "version": "0.1.0",
+  "description": "Per-locale Supabase Auth email templates compiled into one Go-template, with lint, Go-rendered preview and Management API push",
+  "type": "module",
+  "bin": { "authlingo": "src/cli.ts" },
+  "engines": { "node": ">=22.18" },
+  "scripts": { "test": "node --test 'test/*.test.ts'" },
+  "license": "MIT"
+}

@@ -1,0 +1,36 @@
+{
+ "services": {
+  "authlingo-hook": {
+   "container_name": "authlingo-hook",
+   "image": "docker.io/supabase/edge-runtime:v1.77.4",
+   "network_mode": "service:auth",
+   "volumes": [
+    "./volumes/functions:/home/deno/functions:z"
+   ],
+   "command": [
+    "start",
+    "--main-service",
+    "/home/deno/functions/send-email",
+    "-p",
+    "9000"
+   ],
+   "environment": {
+    "SEND_EMAIL_HOOK_SECRET": "v1,whsec_<base64 secret, generate your own>",
+    "SMTP_HOST": "supabase-mail",
+    "SMTP_PORT": "2500",
+    "SMTP_FROM": "noreply@example.com"
+   },
+   "depends_on": [
+    "auth",
+    "mail"
+   ]
+  },
+  "auth": {
+   "environment": {
+    "GOTRUE_HOOK_SEND_EMAIL_ENABLED": "true",
+    "GOTRUE_HOOK_SEND_EMAIL_URI": "http://localhost:9000/",
+    "GOTRUE_HOOK_SEND_EMAIL_SECRETS": "v1,whsec_<base64 secret, generate your own>"
+   }
+  }
+ }
+}

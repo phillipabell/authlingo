@@ -1,0 +1,51 @@
+{
+ "services": {
+  "mail": {
+   "container_name": "supabase-mail",
+   "image": "docker.io/inbucket/inbucket:3.0.3",
+   "ports": [
+    "127.0.0.1:9000:9000"
+   ]
+  },
+  "authlingo-tpl": {
+   "container_name": "authlingo-tpl",
+   "image": "docker.io/library/busybox:1.36",
+   "command": [
+    "httpd",
+    "-f",
+    "-p",
+    "8080",
+    "-h",
+    "/srv"
+   ],
+   "volumes": [
+    "./authlingo-dist:/srv:ro,Z"
+   ]
+  },
+  "auth": {
+   "environment": {
+    "GOTRUE_SMTP_HOST": "supabase-mail",
+    "GOTRUE_SMTP_PORT": "2500",
+    "GOTRUE_SMTP_USER": "",
+    "GOTRUE_SMTP_PASS": "",
+    "GOTRUE_MAILER_AUTOCONFIRM": "false",
+    "GOTRUE_SMTP_MAX_FREQUENCY": "1s",
+    "GOTRUE_RATE_LIMIT_EMAIL_SENT": "1000",
+    "GOTRUE_MAILER_SUBJECTS_CONFIRMATION": "{{ $$authlingo_locale := \"\" }}{{ with .Data }}{{ $$authlingo_locale = printf \"%v\" (or .locale \"\") }}{{ end }}{{ if eq $$authlingo_locale \"fr\" \"fr-FR\" \"fr-CA\" }}Confirmez votre inscription{{ else if eq $$authlingo_locale \"pl\" \"pl-PL\" }}Potwierd\u017a rejestracj\u0119{{ else }}Confirm your signup{{ end }}",
+    "GOTRUE_MAILER_TEMPLATES_CONFIRMATION": "http://authlingo-tpl:8080/confirmation.html",
+    "GOTRUE_MAILER_SUBJECTS_INVITE": "{{ $$authlingo_locale := \"\" }}{{ with .Data }}{{ $$authlingo_locale = printf \"%v\" (or .locale \"\") }}{{ end }}{{ if eq $$authlingo_locale \"fr\" \"fr-FR\" \"fr-CA\" }}Vous \u00eates invit\u00e9{{ else if eq $$authlingo_locale \"pl\" \"pl-PL\" }}Zaproszenie{{ else }}You have been invited{{ end }}",
+    "GOTRUE_MAILER_TEMPLATES_INVITE": "http://authlingo-tpl:8080/invite.html",
+    "GOTRUE_MAILER_SUBJECTS_MAGIC_LINK": "{{ $$authlingo_locale := \"\" }}{{ with .Data }}{{ $$authlingo_locale = printf \"%v\" (or .locale \"\") }}{{ end }}{{ if eq $$authlingo_locale \"fr\" \"fr-FR\" \"fr-CA\" }}Votre lien de connexion{{ else if eq $$authlingo_locale \"pl\" \"pl-PL\" }}Tw\u00f3j link do logowania{{ else }}Your sign-in link{{ end }}",
+    "GOTRUE_MAILER_TEMPLATES_MAGIC_LINK": "http://authlingo-tpl:8080/magic_link.html",
+    "GOTRUE_MAILER_SUBJECTS_RECOVERY": "{{ $$authlingo_locale := \"\" }}{{ with .Data }}{{ $$authlingo_locale = printf \"%v\" (or .locale \"\") }}{{ end }}{{ if eq $$authlingo_locale \"fr\" \"fr-FR\" \"fr-CA\" }}R\u00e9initialisez votre mot de passe{{ else if eq $$authlingo_locale \"pl\" \"pl-PL\" }}Zresetuj has\u0142o{{ else }}Reset your password{{ end }}",
+    "GOTRUE_MAILER_TEMPLATES_RECOVERY": "http://authlingo-tpl:8080/recovery.html",
+    "GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE": "{{ $$authlingo_locale := \"\" }}{{ with .Data }}{{ $$authlingo_locale = printf \"%v\" (or .locale \"\") }}{{ end }}{{ if eq $$authlingo_locale \"fr\" \"fr-FR\" \"fr-CA\" }}Confirmez votre nouvelle adresse{{ else if eq $$authlingo_locale \"pl\" \"pl-PL\" }}Potwierd\u017a nowy adres e-mail{{ else }}Confirm your new email{{ end }}",
+    "GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE": "http://authlingo-tpl:8080/email_change.html"
+   },
+   "depends_on": [
+    "mail",
+    "authlingo-tpl"
+   ]
+  }
+ }
+}

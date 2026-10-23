@@ -1,0 +1,5 @@
+{
+ "localeKey": "locale",
+ "default": "en",
+ "locales": ["en", { "code": "fr", "match": ["fr", "fr-FR", "fr-CA"] }, { "code": "pl", "match": ["pl", "pl-PL"] }]
+}
