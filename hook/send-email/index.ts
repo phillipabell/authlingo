@@ -4,6 +4,8 @@
 // `authlingo build` writes this folder complete into dist/send-email/ (index.ts + core.ts + hook-templates.json).
 // Env (function secrets): SEND_EMAIL_HOOK_SECRET ("v1,whsec_..."), SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
 // SMTP_FROM, optional SUPABASE_URL (default: the site_url in the payload is used to build the verify link).
+// Without SMTP_HOST the hook sends nothing: it logs {authlingo_capture, type, locale, subject} per mail and returns 200
+// (a dry run to check locale picking and rendering on a project before a mail provider is set up).
 import { Webhook } from 'npm:standardwebhooks@1.0.0';
 import nodemailer from 'npm:nodemailer@6.9.16';
 import { pickLocale, renderSimple, type Config, type Sources, type EmailType } from './core.ts';
@@ -18,7 +20,8 @@ const ACTION: Record<string, EmailType> = {
 };
 
 const env = (k: string, d?: string) => Deno.env.get(k) ?? d ?? '';
-const transport = nodemailer.createTransport({
+const capture = !env('SMTP_HOST');
+const transport = capture ? null : nodemailer.createTransport({
   host: env('SMTP_HOST'), port: Number(env('SMTP_PORT', '587')), secure: env('SMTP_PORT') === '465',
   auth: env('SMTP_USER') ? { user: env('SMTP_USER'), pass: env('SMTP_PASS') } : undefined,
 });
@@ -49,8 +52,13 @@ Deno.serve(async (req) => {
     for (const s of sends) {
       const data = { ConfirmationURL: link(s.hash), Token: s.token, TokenHash: s.hash, SiteURL: email_data.site_url,
         RedirectTo: email_data.redirect_to, Email: user.email, NewEmail: user.new_email, Data: user.user_metadata ?? {} };
-      await transport.sendMail({ from: env('SMTP_FROM'), to: s.to, subject: renderSimple(e.subject, data).replace(/[\r\n]+/g, ' '),
-        html: renderSimple(e.body, data), headers: { 'Content-Language': locale } });
+      const subject = renderSimple(e.subject, data).replace(/[\r\n]+/g, ' '), html = renderSimple(e.body, data);
+      if (capture) {
+        console.log(JSON.stringify({ authlingo_capture: true, action: email_data.email_action_type, type, locale,
+          subject, body_has_link: html.includes(data.ConfirmationURL.replaceAll('&', '&amp;')) || html.includes(String(s.token)) }));
+        continue;
+      }
+      await transport!.sendMail({ from: env('SMTP_FROM'), to: s.to, subject, html, headers: { 'Content-Language': locale } });
     }
   } catch (err) {
     return json(500, { error: { http_code: 500, message: `send failed: ${(err as Error).message}` } });

@@ -70,11 +70,32 @@ recovery, magic link, invite (admin) and email change, then checks the caught ma
 - Test tooling note: inbucket's JSON `body.html` field showed UTF-8 bodies as mojibake while the raw message was correct
   UTF-8 quoted-printable; the script parses the raw source.
 
-Not tested yet (hypotheses):
-- A hosted **Free** project accepts the Management API template PATCH (docs show no plan note).
-- `.Data` conditionals behave the same on hosted Auth as on self-hosted v2.197.0.
-- The hook path works on a new Free project that is blocked from editing templates on the default SMTP (since
-  2026-06-03, per Supabase's changelog). The hook needs your own mail provider; authlingo does not send mail itself.
+## Measured on a hosted Free project (2026-10-23)
+
+Setup: an existing Free project on the default email provider (no custom SMTP), Management API with a project-scoped
+access token. Everything changed was put back afterwards: the auth config was saved first and restored, and a diff
+against the saved copy was empty; the test function, its secret and the test users were deleted.
+
+- **Template path: blocked.** `authlingo push --apply` got `400 Email template modification is not available for free
+  tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.`
+  Nothing was changed (0 of 10 fields). On such a project the template path needs custom SMTP.
+- **Hook path: works.** Deploying `dist/send-email` through the Management API (`POST .../functions/deploy`, the three
+  files, `verify_jwt: false`), setting `SEND_EMAIL_HOOK_SECRET`, and enabling the Send Email hook
+  (`hook_send_email_enabled`, `_uri`, `_secrets`) were all accepted on the template-blocked project. Run without
+  `SMTP_HOST`, the hook logs what it would send instead of sending (read back from the project's unified logs,
+  `source = function_logs`):
+  - signup, `locale: "fr-CA"`: locale `fr`, subject "Confirmez votre inscription" (1 of 1);
+  - signup, `locale: 7` (a number): default locale `en`, subject "Confirm your signup" (1 of 1).
+  The link was in both bodies (HTML-escaped, `&amp;`; the first version of the log check missed that and logged
+  `body_has_link: false`, fixed since and checked against a local render).
+- **Rate limit:** the third signup (no locale key) got `429 over_email_send_rate_limit`. The default provider's limit of
+  2 emails per hour applied even though the hook sent nothing itself.
+
+Not tested on hosted (hypotheses or self-hosted only):
+- No locale key, recovery, magic link, invite and email change through the hook (blocked by the 2/hour limit; all
+  measured on self-hosted above).
+- `.Data` conditionals in the template path on hosted Auth (blocked without custom SMTP).
+- Actual delivery through a mail provider from the hook (no paid sender used; delivery measured on self-hosted only).
 - The hook's renderer handles `{{ .Var }}` and `{{ .Data.key }}` only (other Go actions are passed through as text);
   the template path supports full Go templates. Lint does not yet warn when a body needs the template path.
 
